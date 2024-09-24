@@ -1,6 +1,6 @@
 from aiogram import types, F
 from aiogram.fsm.context import FSMContext
-from database import db_operation
+from database import db
 from keyboards import get_inline_keyboard, get_main_keyboard, get_phone_keyboard, get_subscription_keyboard
 from aiogram.types import Message, CallbackQuery
 import json, logging
@@ -29,7 +29,7 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
         else:
             field_names = {'email': 'почту', 'city': 'город', 'post_link': 'ссылку на пост', 'name': 'имя', 'company': 'название компании', 'position': 'должность'}
             if field in field_names:
-                msg = await callback_query.message.answer(f"Пожалуйста, введите {field_names[field]}:")#, reply_markup=get_main_keyboard())
+                msg = await callback_query.message.answer(f"Пожалуйста, введите {field_names[field]}:")
 
                 await state.update_data(last_bot_message_id=msg.message_id, editing_field=field)
                 logging.info(f"Запрошено изменение поля: {field}")
@@ -54,10 +54,10 @@ async def save_data(callback_query: CallbackQuery, state: FSMContext):
         user_data = await state.get_data()
         user_id = callback_query.from_user.id
         db_data = {field: user_data.get(field) for field in ['name', 'email', 'city', 'post_link', 'phone', 'company', 'position']}
-        await db_operation('update', user_id=user_id, **db_data)
+        await db.db_operation('update', user_id=user_id, **db_data)
         
         # Получаем или создаем порядковый номер
-        registration_number = await db_operation('get_or_create_registration_number', user_id=user_id)
+        registration_number = await db.db_operation('get_or_create_registration_number', user_id=user_id)
         
         await callback_query.answer("Данные успешно сохранены!", show_alert=False)
         
@@ -69,7 +69,6 @@ async def save_data(callback_query: CallbackQuery, state: FSMContext):
     except Exception as e:
         print(f"Ошибка при сохранении данных: {e}")
         await callback_query.answer("Произошла ошибка при сохранении данных. Пожалуйста, попробуйте еще раз позже.", show_alert=True)
-
 
 async def process_input(message: Message, state: FSMContext):
     user_data = await state.get_data()
@@ -134,26 +133,6 @@ async def update_user_data(message: Message, state: FSMContext):
         new_message = await message.answer(data_text, reply_markup=keyboard)
         await state.update_data(data_message_id=new_message.message_id)
 
-    # Показываем main_keyboard без дополнительного текста
-    #await message.answer(text="", reply_markup=get_main_keyboard())
-    # Обновляем клавиатуру последнего сообщения
-    #await message.bot.edit_message_reply_markup(
-    #    chat_id=message.chat.id,
-    #    message_id=message.message_id,
-    #    #reply_markup=get_main_keyboard()
-    #)
-
-async def send_data(callback_query: CallbackQuery, state: FSMContext):
-    keyboard = get_subscription_keyboard()
-    await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-
-def register_handlers_user_input(dp):
-    dp.callback_query.register(process_callback_input)
-    dp.message.register(process_input, ~F.contact & ~F.text.in_(["Показать мои данные", "Отменить участие"]))
-    dp.message.register(process_phone_contact, F.contact)
-    dp.message.register(show_current_data, F.text == "Показать мои данные")
-    dp.message.register(cancel_participation, F.text == "Отменить участие")
-
 async def show_current_data(message: Message, state: FSMContext):
     new_message = await message.answer("Загрузка данных...", reply_markup=get_main_keyboard())
 
@@ -183,7 +162,7 @@ async def process_phone_contact(message: Message, state: FSMContext):
 
 async def cancel_participation(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    await db_operation('update', user_id=user_id, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None)
+    await db.db_operation('update', user_id=user_id, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None)
     await state.clear()
     await message.answer("Ваше участие в розыгрыше отменено. Все данные удалены.", reply_markup=get_main_keyboard())
     await message.answer("Чтобы начать заново, отправьте команду /start")

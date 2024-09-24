@@ -1,7 +1,7 @@
 from aiogram import types
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
-from database import db_operation
+from database import db
 from keyboards import get_main_keyboard, get_inline_keyboard
 from aiogram.types import Message
 from handlers_user_input import update_user_data
@@ -11,9 +11,9 @@ from config import CHANNEL_NAME
 async def cmd_start(message: Message, state: FSMContext):
     logging.info(f"Start command received from user {message.from_user.id}")
     user_id = message.from_user.id
-    user_data = await db_operation('select', user_id=user_id)
+    user_data = await db.db_operation('select', user_id=user_id)
     if not user_data:
-        await db_operation('insert', user_id=user_id)
+        await db.db_operation('insert', user_id=user_id)
         user_data = (user_id, None, None, None, None, None, None, None)
     
     user_dict = {

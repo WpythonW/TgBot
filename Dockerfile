@@ -10,4 +10,4 @@ COPY . .
 RUN useradd -m myuser
 USER myuser
 
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "sleep 10 && python main.py"]
