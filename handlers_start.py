@@ -1,3 +1,5 @@
+# handlers_start.py
+
 from aiogram import types
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
@@ -39,13 +41,10 @@ async def cmd_start(message: Message, state: FSMContext):
                     "- Должность\n\n"
                     "Выберите данные для ввода или изменения. Учтите, что при розыгрыше будет проверяться наличие поста.")
     
-    inline_keyboard = get_inline_keyboard()
-    start_message = await message.answer(welcome_text, reply_markup=inline_keyboard)
-    await state.update_data(data_message_id=start_message.message_id)
-    logging.info(f"Inline keyboard sent to user {message.from_user.id}")
+    await message.answer(welcome_text)
+    logging.info(f"Welcome message sent to user {message.from_user.id}")
     
     await update_user_data(message, state)
-
 
 def register_handlers_start(dp):
     dp.message.register(cmd_start, Command("start"))

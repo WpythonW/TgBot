@@ -1,5 +1,5 @@
 import aiosqlite
-import asyncio
+import asyncio, logging
 from config import DB_PATH
 
 class Database:
@@ -30,30 +30,36 @@ class Database:
         ''')
         await self.db.commit()
 
-    async def db_operation(self, operation, user_id=None, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None):
+    async def db_operation(self, operation, user_id=None, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None, registration_number=None):
         try:
             if operation == 'update':
-                updates = []
-                params = []
-                for field, value in [('email', email), ('city', city), ('post_link', post_link), ('phone', phone), ('name', name), ('company', company), ('position', position)]:
-                    if value is not None:
-                        updates.append(f"{field} = ?")
-                        params.append(value)
-                if updates:
-                    params.append(user_id)
-                    query = f"UPDATE users SET {', '.join(updates)} WHERE user_id = ?"
-                    await self.db.execute(query, params)
-                    await self.db.commit()
+                query = """
+                UPDATE users 
+                SET email = ?, city = ?, post_link = ?, phone = ?, name = ?, company = ?, position = ?, registration_number = ?
+                WHERE user_id = ?
+                """
+                params = (email, city, post_link, phone, name, company, position, registration_number, user_id)
+                await self.db.execute(query, params)
+                await self.db.commit()
+                logging.info(f"Update operation completed for user {user_id}")
             
             elif operation == 'select':
                 query = "SELECT * FROM users WHERE user_id = ?"
                 async with self.db.execute(query, (user_id,)) as cursor:
-                    return await cursor.fetchone()
+                    result = await cursor.fetchone()
+                    logging.info(f"Select operation result for user {user_id}: {result}")
+                    return result
             
             elif operation == 'insert':
-                query = "INSERT INTO users (user_id, email, city, post_link, phone, name, company, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                await self.db.execute(query, (user_id, email, city, post_link, phone, name, company, position))
+                query = """
+                INSERT OR REPLACE INTO users 
+                (user_id, email, city, post_link, phone, name, company, position, registration_number) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                params = (user_id, email, city, post_link, phone, name, company, position, registration_number)
+                await self.db.execute(query, params)
                 await self.db.commit()
+                logging.info(f"Insert operation completed for user {user_id}")
             
             elif operation == 'get_or_create_registration_number':
                 async with self.db.execute("SELECT registration_number FROM users WHERE user_id = ?", (user_id,)) as cursor:
@@ -70,7 +76,7 @@ class Database:
                     return new_number
         
         except Exception as e:
-            print(f"Error in db_operation: {e}")
+            logging.error(f"Error in db_operation: {e}")
             raise
 
 db = Database()

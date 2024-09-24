@@ -12,12 +12,12 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
     logging.info(f"Получен callback: {action}")
 
     user_data = await state.get_data()
-    last_bot_message_id = user_data.get('last_bot_message_id')
+    input_message_id = user_data.get('input_message_id')
 
     # Удаляем предыдущее сообщение с запросом ввода, если оно существует
-    if last_bot_message_id:
+    if input_message_id:
         try:
-            await callback_query.bot.delete_message(callback_query.message.chat.id, last_bot_message_id)
+            await callback_query.bot.delete_message(callback_query.message.chat.id, input_message_id)
         except Exception as e:
             logging.error(f"Ошибка при удалении предыдущего сообщения: {e}")
 
@@ -25,13 +25,13 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
         field = action[7:]
         logging.info(f"Изменяемое поле: {field}")
         if field == "phone":
-            await process_phone_share(callback_query.message, state)
+            msg = await process_phone_share(callback_query.message, state)
+            await state.update_data(input_message_id=msg.message_id, editing_field=field)
         else:
             field_names = {'email': 'почту', 'city': 'город', 'post_link': 'ссылку на пост', 'name': 'имя', 'company': 'название компании', 'position': 'должность'}
             if field in field_names:
                 msg = await callback_query.message.answer(f"Пожалуйста, введите {field_names[field]}:")
-
-                await state.update_data(last_bot_message_id=msg.message_id, editing_field=field)
+                await state.update_data(input_message_id=msg.message_id, editing_field=field)
                 logging.info(f"Запрошено изменение поля: {field}")
             else:
                 await callback_query.answer("Неизвестное поле")
@@ -44,6 +44,7 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
         await callback_query.answer("Неизвестное действие")
     
     await callback_query.answer()
+
 
 async def request_subscription(callback_query: CallbackQuery, state: FSMContext):
     keyboard = get_subscription_keyboard()
@@ -70,31 +71,28 @@ async def save_data(callback_query: CallbackQuery, state: FSMContext):
         print(f"Ошибка при сохранении данных: {e}")
         await callback_query.answer("Произошла ошибка при сохранении данных. Пожалуйста, попробуйте еще раз позже.", show_alert=True)
 
+
 async def process_input(message: Message, state: FSMContext):
     user_data = await state.get_data()
     editing_field = user_data.get('editing_field')
     
     if editing_field:
         await state.update_data({editing_field: message.text})
+        
+        # Удаляем сообщение пользователя
         await message.delete()
         
-        last_bot_message_id = user_data.get('last_bot_message_id')
-        if last_bot_message_id:
+        # Удаляем сообщение бота с запросом ввода
+        input_message_id = user_data.get('input_message_id')
+        if input_message_id:
             try:
-                await message.bot.delete_message(message.chat.id, last_bot_message_id)
-            except:
-                pass
-        
-        if editing_field == "phone":
-            phone_request_message_id = user_data.get('phone_request_message_id')
-            if phone_request_message_id:
-                try:
-                    await message.bot.delete_message(message.chat.id, phone_request_message_id)
-                except:
-                    pass
+                await message.bot.delete_message(message.chat.id, input_message_id)
+            except Exception as e:
+                logging.error(f"Ошибка при удалении сообщения бота: {e}")
         
         await update_user_data(message, state)
-        await state.update_data(editing_field=None, last_bot_message_id=None, phone_request_message_id=None)
+        await state.update_data(editing_field=None, input_message_id=None)
+
 
 async def update_user_data(message: Message, state: FSMContext):
     user_data = await state.get_data()
@@ -133,6 +131,7 @@ async def update_user_data(message: Message, state: FSMContext):
         new_message = await message.answer(data_text, reply_markup=keyboard)
         await state.update_data(data_message_id=new_message.message_id)
 
+
 async def show_current_data(message: Message, state: FSMContext):
     new_message = await message.answer("Загрузка данных...", reply_markup=get_main_keyboard())
 
@@ -142,30 +141,65 @@ async def show_current_data(message: Message, state: FSMContext):
 async def process_phone_share(message: Message, state: FSMContext):
     keyboard = get_phone_keyboard()
     msg = await message.answer("Нажмите кнопку, чтобы поделиться номером телефона:", reply_markup=keyboard)
-    await state.update_data(editing_field="phone", phone_request_message_id=msg.message_id)
+    await state.update_data(input_message_id=msg.message_id)
+    return msg
 
 async def process_phone_contact(message: Message, state: FSMContext):
     phone = message.contact.phone_number
     await state.update_data(phone=phone, editing_field=None)
     
+    # Удаляем сообщение пользователя с контактом
     await message.delete()
     
+    # Удаляем сообщение бота с запросом номера телефона
     user_data = await state.get_data()
-    phone_request_message_id = user_data.get('phone_request_message_id')
-    if phone_request_message_id:
+    input_message_id = user_data.get('input_message_id')
+    if input_message_id:
         try:
-            await message.bot.delete_message(message.chat.id, phone_request_message_id)
-        except:
-            pass
+            await message.bot.delete_message(message.chat.id, input_message_id)
+        except Exception as e:
+            logging.error(f"Ошибка при удалении сообщения с запросом номера телефона: {e}")
     
     await update_user_data(message, state)
+    await state.update_data(input_message_id=None)
 
+# handlers_user_input.py
 async def cancel_participation(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    await db.db_operation('update', user_id=user_id, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None)
+    logging.info(f"Attempting to cancel participation for user {user_id}")
+    
+    # Удаляем данные пользователя из базы данных
+    try:
+        await db.db_operation('update', user_id=user_id, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None, registration_number=None)
+        logging.info(f"Database update operation completed for user {user_id}")
+    except Exception as e:
+        logging.error(f"Error updating database for user {user_id}: {e}")
+    
+    # Очищаем состояние пользователя
     await state.clear()
-    await message.answer("Ваше участие в розыгрыше отменено. Все данные удалены.", reply_markup=get_main_keyboard())
-    await message.answer("Чтобы начать заново, отправьте команду /start")
+    logging.info(f"State cleared for user {user_id}")
+    
+    # Удаляем сообщение с данными пользователя, если оно существует
+    user_data = await state.get_data()
+    data_message_id = user_data.get('data_message_id')
+    if data_message_id:
+        try:
+            await message.bot.delete_message(message.chat.id, data_message_id)
+            logging.info(f"Deleted data message for user {user_id}")
+        except Exception as e:
+            logging.error(f"Error deleting data message for user {user_id}: {e}")
+    
+    # Проверяем, что данные действительно удалены
+    user_data = await db.db_operation('select', user_id=user_id)
+    logging.info(f"User data after deletion attempt: {user_data}")
+    if user_data and any(user_data[1:]):  # Проверяем все поля, кроме user_id
+        logging.error(f"Data for user {user_id} was not fully deleted. Remaining data: {user_data}")
+        await message.answer("Произошла ошибка при удалении данных. Пожалуйста, обратитесь к администратору.")
+    else:
+        logging.info(f"All data successfully deleted for user {user_id}")
+        await message.answer("Ваше участие в розыгрыше отменено. Все данные удалены.", reply_markup=get_main_keyboard())
+        await message.answer("Чтобы начать заново, отправьте команду /start")
+
 
 def register_handlers_user_input(dp):
     dp.callback_query.register(process_callback_input)
