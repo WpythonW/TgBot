@@ -3,11 +3,7 @@
 import aiosqlite
 import asyncio
 import os
-
-# Получаем параметры подключения из переменных окружения
-DB_HOST = 'localhost'
-DB_PORT = '5432'
-DB_PATH = '/data/users.db'
+from config import DB_HOST, DB_PATH, DB_PORT
 
 async def db_operation(operation, user_id=None, email=None, city=None, post_link=None, phone=None, name=None, company=None, position=None):
     try:
