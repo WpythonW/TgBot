@@ -1,0 +1,28 @@
+services:
+  app:
+    build: .
+    environment:
+      - DB_PATH=/data/users.db
+    volumes:
+      - .:/app
+      - data:/data
+    depends_on:
+      - db
+
+  db:
+    image: alpine
+    volumes:
+      - data:/data
+    command: >
+      sh -c "
+        mkdir -p /data &&
+        chown 1000:1000 /data &&
+        chmod 777 /data &&
+        touch /data/users.db &&
+        chown 1000:1000 /data/users.db &&
+        chmod 666 /data/users.db &&
+        tail -f /dev/null
+      "
+
+volumes:
+  data:
