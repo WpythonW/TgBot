@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from database import db
 from keyboards import get_main_keyboard, get_inline_keyboard
 from aiogram.types import Message
-from handlers_user_input import update_user_data
+from handlers_user_input import update_user_data, show_current_data, show_registration_number
 import logging
 from config import CHANNEL_NAME
 
@@ -39,7 +39,8 @@ async def cmd_start(message: Message, state: FSMContext):
                     "- Номер телефона\n"
                     "- Название компании\n"
                     "- Должность\n\n"
-                    "Выберите данные для ввода или изменения. Учтите, что при розыгрыше будет проверяться выполнение всех пунктов, в том числе, пункт 3 (публикация фото скутера)")
+                    "Выберите данные для ввода или изменения. Учтите, что при розыгрыше будет проверяться наличие поста.")
+    
     await message.answer(welcome_text)
     logging.info(f"Welcome message sent to user {message.from_user.id}")
     
@@ -47,3 +48,5 @@ async def cmd_start(message: Message, state: FSMContext):
 
 def register_handlers_start(dp):
     dp.message.register(cmd_start, Command("start"))
+    dp.message.register(show_registration_number, Command("number"))
+    dp.message.register(show_current_data, Command("mydata"))
