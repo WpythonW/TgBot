@@ -6,6 +6,7 @@ from aiogram.types import Message, CallbackQuery
 import json, logging
 from config import CHANNEL_NAME
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import Command
 
 async def process_callback_input(callback_query: CallbackQuery, state: FSMContext):
     action = callback_query.data
@@ -37,18 +38,13 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
                 await callback_query.answer("Неизвестное поле")
                 logging.warning(f"Получено неизвестное поле: {field}")
     elif action == "send_data":
-        # Проверяем, все ли поля заполнены
-        if all(user_data.get(field) for field in ['name', 'email', 'city', 'post_link', 'phone', 'company', 'position']):
-            await request_subscription(callback_query, state)
-        else:
-            await callback_query.answer("Пожалуйста, заполните все поля перед отправкой данных.", show_alert=True)
+        await request_subscription(callback_query, state)
     elif action == "check_subscription":
         await save_data(callback_query, state)
     else:
         await callback_query.answer("Неизвестное действие")
     
-    if action != "send_data":
-        await callback_query.answer()
+    await callback_query.answer()
 
 
 async def request_subscription(callback_query: CallbackQuery, state: FSMContext):
@@ -205,6 +201,15 @@ async def cancel_participation(message: Message, state: FSMContext):
         await message.answer("Ваше участие в розыгрыше отменено. Все данные удалены.", reply_markup=get_main_keyboard())
         await message.answer("Чтобы начать заново, отправьте команду /start")
 
+async def show_registration_number(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    user_data = await db.db_operation('select', user_id=user_id)
+    
+    if user_data and user_data[8] is not None:  # Проверяем наличие registration_number (индекс 8)
+        registration_number = user_data[8]
+        await message.answer(f"Ваш порядковый номер в розыгрыше: {registration_number}")
+    else:
+        await message.answer("Извините, вы ещё не зарегистрированы на розыгрыш.")
 
 def register_handlers_user_input(dp):
     dp.callback_query.register(process_callback_input)
