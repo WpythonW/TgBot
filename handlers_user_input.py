@@ -37,13 +37,18 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
                 await callback_query.answer("Неизвестное поле")
                 logging.warning(f"Получено неизвестное поле: {field}")
     elif action == "send_data":
-        await request_subscription(callback_query, state)
+        # Проверяем, все ли поля заполнены
+        if all(user_data.get(field) for field in ['name', 'email', 'city', 'post_link', 'phone', 'company', 'position']):
+            await request_subscription(callback_query, state)
+        else:
+            await callback_query.answer("Пожалуйста, заполните все поля перед отправкой данных.", show_alert=True)
     elif action == "check_subscription":
         await save_data(callback_query, state)
     else:
         await callback_query.answer("Неизвестное действие")
     
-    await callback_query.answer()
+    if action != "send_data":
+        await callback_query.answer()
 
 
 async def request_subscription(callback_query: CallbackQuery, state: FSMContext):
