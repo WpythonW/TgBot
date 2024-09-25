@@ -38,10 +38,11 @@ async def process_callback_input(callback_query: CallbackQuery, state: FSMContex
                 logging.warning(f"Получено неизвестное поле: {field}")
     elif action == "send_data":
         # Проверяем, все ли поля заполнены
-        if all(user_data.get(field) for field in ['name', 'email', 'city', 'post_link', 'phone', 'company', 'position']):
-            await request_subscription(callback_query, state)
-        else:
-            await callback_query.answer("Пожалуйста, заполните все поля перед отправкой данных.", show_alert=True)
+        #if all(user_data.get(field) for field in ['name', 'email', 'city', 'post_link', 'phone', 'company', 'position']):
+        #    await request_subscription(callback_query, state)
+        #else:
+        #    await callback_query.answer("Пожалуйста, заполните все поля перед отправкой данных.", show_alert=True)
+        await request_subscription(callback_query, state)
     elif action == "check_subscription":
         await save_data(callback_query, state)
     else:
@@ -60,10 +61,22 @@ async def save_data(callback_query: CallbackQuery, state: FSMContext):
         user_data = await state.get_data()
         user_id = callback_query.from_user.id
         db_data = {field: user_data.get(field) for field in ['name', 'email', 'city', 'post_link', 'phone', 'company', 'position']}
-        await db.db_operation('update', user_id=user_id, **db_data)
         
-        # Получаем или создаем порядковый номер
-        registration_number = await db.db_operation('get_or_create_registration_number', user_id=user_id)
+        # Получаем текущие данные пользователя из базы данных
+        current_user_data = await db.db_operation('select', user_id=user_id)
+        
+        # Проверяем, есть ли у пользователя уже номер регистрации
+        if current_user_data and current_user_data[8] is not None:
+            registration_number = current_user_data[8]
+        else:
+            # Если номера нет, только тогда создаем новый
+            registration_number = await db.db_operation('get_or_create_registration_number', user_id=user_id)
+        
+        # Добавляем registration_number к данным для обновления
+        db_data['registration_number'] = registration_number
+        
+        # Обновляем данные пользователя
+        await db.db_operation('update', user_id=user_id, **db_data)
         
         await callback_query.answer("Данные успешно сохранены!", show_alert=False)
         
