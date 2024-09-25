@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from database import db
 from keyboards import get_main_keyboard, get_inline_keyboard
 from aiogram.types import Message
-from handlers_user_input import update_user_data, show_current_data, show_registration_number
+from handlers_user_input import update_user_data, show_current_data, show_registration_number, cancel_participation
 import logging
 from config import CHANNEL_NAME
 
@@ -50,3 +50,4 @@ def register_handlers_start(dp):
     dp.message.register(cmd_start, Command("start"))
     dp.message.register(show_registration_number, Command("number"))
     dp.message.register(show_current_data, Command("mydata"))
+    dp.message.register(cancel_participation, Command("cancel"))
