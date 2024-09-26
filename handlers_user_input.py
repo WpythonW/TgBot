@@ -81,9 +81,9 @@ async def save_data(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.answer("Данные успешно сохранены!", show_alert=False)
         
         # Отправляем сообщение с порядковым номером
-        await callback_query.message.answer(f"Ваши данные успешно обновлены.\nВаш порядковый номер: {registration_number}", reply_markup=get_main_keyboard())
+        await callback_query.message.answer(f"Ваши данные успешно сохранены.\nВаш регистрационный номер: {registration_number}", reply_markup=get_main_keyboard())
 
-        await callback_query.message.answer("Вы можете проверить свои данные или отменить участие.", reply_markup=get_main_keyboard())
+        await callback_query.message.answer("Вы можете в любой момент изменить и проверить свои данные или отменить участие.", reply_markup=get_main_keyboard())
 
     except Exception as e:
         print(f"Ошибка при сохранении данных: {e}")
@@ -151,8 +151,47 @@ async def update_user_data(message: Message, state: FSMContext):
 
 
 async def show_current_data(message: Message, state: FSMContext):
-    new_message = await message.answer("Загрузка данных...", reply_markup=get_main_keyboard())
+    user_id = message.from_user.id
+    
+    # Получаем текущие данные из состояния
+    current_state = await state.get_data()
+    
+    # Проверяем, есть ли хоть какие-то данные в состоянии
+    if any(current_state.values()):
+        user_dict = current_state
+    else:
+        # Если в состоянии нет данных, получаем их из базы данных
+        user_data = await db.db_operation('select', user_id=user_id)
+        
+        if user_data:
+            # Преобразуем данные из базы в словарь
+            user_dict = {
+                'name': user_data[5],
+                'email': user_data[1],
+                'city': user_data[2],
+                'post_link': user_data[3],
+                'phone': user_data[4],
+                'company': user_data[6],
+                'position': user_data[7]
+            }
+            
+            # Обновляем состояние с данными из базы
+            await state.set_data(user_dict)
+        else:
+            # Если пользователя нет в базе, создаем пустой словарь
+            user_dict = {
+                'name': None,
+                'email': None,
+                'city': None,
+                'post_link': None,
+                'phone': None,
+                'company': None,
+                'position': None
+            }
+            await state.set_data(user_dict)
 
+    # Отправляем сообщение с данными
+    new_message = await message.answer("Загрузка данных...", reply_markup=get_main_keyboard())
     await state.update_data(data_message_id=new_message.message_id)
     await update_user_data(message, state)
 
